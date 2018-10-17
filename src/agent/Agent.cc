@@ -336,6 +336,9 @@ void Agent::handlePacket(ReadBuffer &packet)
     case AgentMsg::GetConsoleProcessList:
         handleGetConsoleProcessListPacket(packet);
         break;
+    case AgentMsg::GetCurrentDirectoryCommand:
+        handleGetCurrentDirectoryPacket(packet);
+        break;
     default:
         trace("Unrecognized message, id:%d", type);
     }
@@ -470,6 +473,25 @@ void Agent::pollConinPipe()
     } else {
         m_consoleInput->writeInput(newData);
     }
+}
+
+void Agent::handleGetCurrentDirectoryPacket(ReadBuffer &packet)
+{
+    DWORD nBufferLength = packet.getInt32();
+    packet.assertEof();
+
+    LPWSTR buffer = new WCHAR[nBufferLength];
+    DWORD dwRet = GetCurrentDirectoryW(nBufferLength, buffer);
+
+    if (dwRet == 0) {
+        trace("GetCurrentDirectory failed");
+    }
+
+    auto reply = newPacket();
+    reply.putInt32(dwRet);
+    size_t size = wcsnlen(buffer, std::min<DWORD>(nBufferLength, dwRet + 1) - 1);
+    reply.putWString(buffer, size);
+    writePacket(reply);
 }
 
 void Agent::onPollTimeout()

@@ -962,6 +962,28 @@ winpty_get_console_process_list(winpty_t *wp, int *processList, const int proces
     } API_CATCH(0)
 }
 
+WINPTY_API DWORD
+winpty_get_current_directory(winpty_t *wp, DWORD nBufferLength, LPWSTR lpBuffer,
+                             winpty_error_ptr_t *err /*OPTIONAL*/) {
+    API_TRY {
+        ASSERT(wp != nullptr);
+        LockGuard<Mutex> lock(wp->mutex);
+        RpcOperation rpc(*wp);
+        auto packet = newPacket();
+        packet.putInt32(AgentMsg::GetCurrentDirectoryCommand);
+        packet.putInt32(nBufferLength);
+        writePacket(*wp, packet);
+        auto reply = readPacket(*wp);
+
+        const DWORD dwRet = reply.getInt32();
+        std::wstring currentDir = reply.getWString();
+        reply.assertEof();
+        wcscpy_s(lpBuffer, nBufferLength, currentDir.c_str());
+        rpc.success();
+        return dwRet;
+    } API_CATCH(0)
+}
+
 WINPTY_API void winpty_free(winpty_t *wp) {
     // At least in principle, CloseHandle can fail, so this deletion can
     // fail.  It won't throw an exception, but maybe there's an error that
